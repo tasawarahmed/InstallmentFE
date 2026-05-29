@@ -681,7 +681,7 @@ export class CustomersModalComponent implements OnInit {
 
   ngOnInit(): void {
     this.api.getProducts().subscribe({ next: d => this.products = d, error: () => {} });
-    this.api.getInstallmentPlans().subscribe({ next: d => this.plans = d, error: () => {} });
+    this.api.getInstallmentPlans().subscribe({ next: d => { this.plans = d; this.cdr.detectChanges() } , error: () => {} });
     this.loadCustomers();
   }
 
@@ -742,7 +742,7 @@ export class CustomersModalComponent implements OnInit {
     this.view = 'view';
     this.plansLoading = true;
     this.api.getInstallmentPlansByCustomer(c.customerID!).subscribe({
-      next: d => { this.selectedPlans = d; this.plansLoading = false; },
+      next: d => { this.selectedPlans = d; this.plansLoading = false; this.cdr.detectChanges() },
       error: () => { this.selectedPlans = []; this.plansLoading = false; }
     });
   }

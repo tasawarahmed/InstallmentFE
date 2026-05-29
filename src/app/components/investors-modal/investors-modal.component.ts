@@ -561,7 +561,7 @@ export class InvestorsModalComponent implements OnInit {
     this.view = 'view';
     this.investmentsLoading = true;
     this.api.getInvestmentsByInvestor(i.investorID!).subscribe({
-      next: d => { this.selectedInvestments = d; this.investmentsLoading = false; },
+      next: d => { this.selectedInvestments = d; this.investmentsLoading = false; this.cdr.detectChanges() },
       error: () => { this.selectedInvestments = []; this.investmentsLoading = false; }
     });
   }
