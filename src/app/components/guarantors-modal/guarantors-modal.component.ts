@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -293,7 +293,7 @@ export class GuarantorsModalComponent implements OnInit {
 
   form: Partial<Guarantor> = this.blankForm();
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.api.getCustomers().subscribe({ next: d => this.customers = d, error: () => {} });
@@ -303,7 +303,7 @@ export class GuarantorsModalComponent implements OnInit {
   private loadGuarantors(): void {
     this.loading = true;
     this.api.getGuarantors().subscribe({
-      next: d => { this.guarantors = d; this.loading = false; },
+      next: d => { this.guarantors = d; this.loading = false; this.cdr.detectChanges(); },
       error: () => { this.error = 'Failed to load guarantors.'; this.loading = false; }
     });
   }

@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -508,7 +508,7 @@ export class InvestorsModalComponent implements OnInit {
   profitPaymentForm: Partial<ProfitPayment> = this.blankProfitForm();
   withdrawInvestmentId = 0;
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.api.getInvestments().subscribe({ next: d => this.investments = d, error: () => {} });
@@ -518,7 +518,7 @@ export class InvestorsModalComponent implements OnInit {
   private loadInvestors(): void {
     this.loading = true;
     this.api.getInvestors().subscribe({
-      next: d => { this.investors = d; this.loading = false; },
+      next: d => { this.investors = d; this.loading = false; this.cdr.detectChanges(); },
       error: () => { this.error = 'Failed to load investors.'; this.loading = false; }
     });
   }

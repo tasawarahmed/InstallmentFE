@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -170,15 +170,15 @@ export class ProductCategoriesModalComponent implements OnInit {
   search = '';
   form: Partial<ProductCategory> = { categoryName: '', description: '' };
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void { this.loadCategories(); }
 
   private loadCategories(): void {
     this.loading = true;
     this.api.getProductCategories().subscribe({
-      next: d => { this.categories = d; this.loading = false; },
-      error: () => { this.error = 'Failed to load categories.'; this.loading = false; }
+      next: d => { this.categories = d; this.loading = false; this.cdr.detectChanges(); },
+      error: () => { this.error = 'Failed to load categories.'; this.loading = false;}
     });
   }
 

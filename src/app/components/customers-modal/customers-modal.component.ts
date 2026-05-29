@@ -1,4 +1,4 @@
-import { Component, OnInit, Output, EventEmitter } from '@angular/core';
+import { Component, OnInit, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
@@ -677,7 +677,7 @@ export class CustomersModalComponent implements OnInit {
   planForm: Partial<InstallmentPlan> = this.blankPlan();
   paymentForm: Partial<InstallmentPayment> = this.blankPayment();
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.api.getProducts().subscribe({ next: d => this.products = d, error: () => {} });
@@ -688,7 +688,7 @@ export class CustomersModalComponent implements OnInit {
   private loadCustomers(): void {
     this.loading = true;
     this.api.getCustomers().subscribe({
-      next: d => { this.customers = d; this.loading = false; },
+      next: d => { this.customers = d; this.loading = false; this.cdr.detectChanges(); },
       error: () => { this.error = 'Failed to load customers.'; this.loading = false; }
     });
   }

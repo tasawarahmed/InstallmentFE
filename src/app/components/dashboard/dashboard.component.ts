@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ApiService } from '../../services/api.service';
 import { CustomersModalComponent } from '../customers-modal/customers-modal.component';
@@ -156,7 +156,7 @@ export class DashboardComponent implements OnInit {
     { id: 'categories',  title: 'Product Categories', icon: 'category',      color: '#388e3c', count: 0, loading: true },
   ];
 
-  constructor(private api: ApiService) {}
+  constructor(private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit(): void {
     this.loadCounts();
@@ -187,7 +187,7 @@ export class DashboardComponent implements OnInit {
 
   private setCount(id: string, count: number): void {
     const card = this.cards.find(c => c.id === id);
-    if (card) { card.count = count; card.loading = false; }
+    if (card) { card.count = count; card.loading = false; this.cdr.detectChanges(); }
   }
 
   openModal(id: string): void {
