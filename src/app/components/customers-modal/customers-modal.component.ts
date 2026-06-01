@@ -57,8 +57,8 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
                   <td>{{ c.city }}</td>
                   <td><span class="badge" [ngClass]="customerStatusClass(c.status)">{{ c.status }}</span></td>
                   <td>
-                    <span class="badge badge-info" *ngIf="getActivePlans(c.customerID!).length > 0">{{ getActivePlans(c.customerID!).length }} plan(s)</span>
-                    <span class="text-muted text-sm" *ngIf="getActivePlans(c.customerID!).length === 0">None</span>
+                    <span class="badge badge-info" *ngIf="getActivePlans(c.customerId!).length > 0">{{ getActivePlans(c.customerId!).length }} plan(s)</span>
+                    <span class="text-muted text-sm" *ngIf="getActivePlans(c.customerId!).length === 0">None</span>
                   </td>
                   <td>
                     <div class="actions" (click)="$event.stopPropagation()">
@@ -705,7 +705,7 @@ export class CustomersModalComponent implements OnInit {
   }
 
   getActivePlans(customerId: number): InstallmentPlan[] {
-    return this.plans.filter(p => p.customerID === customerId && p.status === 'Active');
+    return this.plans.filter(p => p.customerId === customerId && p.status === 'Active');
   }
 
   getProductName(id?: number): string {
@@ -741,7 +741,7 @@ export class CustomersModalComponent implements OnInit {
     this.selected = c;
     this.view = 'view';
     this.plansLoading = true;
-    this.api.getInstallmentPlansByCustomer(c.customerID!).subscribe({
+    this.api.getInstallmentPlansByCustomer(c.customerId!).subscribe({
       next: d => { this.selectedPlans = d; this.plansLoading = false; this.cdr.detectChanges() },
       error: () => { this.selectedPlans = []; this.plansLoading = false; }
     });
@@ -784,11 +784,11 @@ export class CustomersModalComponent implements OnInit {
         const promises: Array<() => void> = [];
         for (const g of this.inlineGuarantors) {
           if (g.firstName && g.cnic && g.phone) {
-            this.api.createGuarantor({ ...g, customerID: newCust.customerID! } as Guarantor).subscribe();
+            this.api.createGuarantor({ ...g, customerId: newCust.customerId! } as Guarantor).subscribe();
           }
         }
         if (this.addPlanInline && this.planForm.productID) {
-          this.api.createInstallmentPlan({ ...this.planForm, customerID: newCust.customerID!, status: 'Active' } as InstallmentPlan).subscribe({
+          this.api.createInstallmentPlan({ ...this.planForm, customerId: newCust.customerId!, status: 'Active' } as InstallmentPlan).subscribe({
             next: p => this.plans.push(p)
           });
         }
@@ -803,7 +803,7 @@ export class CustomersModalComponent implements OnInit {
   saveEdit(f: NgForm): void {
     if (f.valid !== true) { f.form.markAllAsTouched(); return; }
     this.saving = true;
-    this.api.updateCustomer(this.custForm.customerID!, this.custForm as Customer).subscribe({
+    this.api.updateCustomer(this.custForm.customerId!, this.custForm as Customer).subscribe({
       next: () => { this.saving = false; this.loadCustomers(); this.view = 'list'; },
       error: () => { this.saving = false; this.formError = 'Failed to save.'; }
     });
@@ -812,7 +812,7 @@ export class CustomersModalComponent implements OnInit {
   savePlan(f: NgForm): void {
     if (f.valid !== true) { f.form.markAllAsTouched(); return; }
     this.saving = true;
-    const payload: InstallmentPlan = { ...this.planForm, customerID: this.selected!.customerID!, status: 'Active' } as InstallmentPlan;
+    const payload: InstallmentPlan = { ...this.planForm, customerId: this.selected!.customerId!, status: 'Active' } as InstallmentPlan;
     this.api.createInstallmentPlan(payload).subscribe({
       next: p => { this.plans.push(p); this.saving = false; this.subView = null; },
       error: () => { this.saving = false; this.subFormError = 'Failed to create plan.'; }

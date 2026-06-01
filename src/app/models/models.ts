@@ -1,5 +1,5 @@
 export interface Customer {
-  customerID?: number;
+  customerId?: number;
   firstName: string;
   lastName: string;
   cnic: string;
@@ -20,7 +20,7 @@ export interface Customer {
 
 export interface Guarantor {
   guarantorID?: number;
-  customerID: number;
+  customerId: number;
   firstName: string;
   lastName: string;
   cnic: string;
@@ -96,7 +96,7 @@ export interface Product {
 
 export interface InstallmentPlan {
   planID?: number;
-  customerID: number;
+  customerId: number;
   productID: number;
   productSalePrice: number;
   downPayment: number;

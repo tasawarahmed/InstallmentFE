@@ -62,7 +62,7 @@ type ModalView = 'list' | 'add' | 'edit' | 'view';
                   <td>{{ g.phone }}</td>
                   <td>{{ g.relation || '—' }}</td>
                   <td>{{ g.occupation || '—' }}</td>
-                  <td>{{ getCustomerName(g.customerID) }}</td>
+                  <td>{{ getCustomerName(g.customerId) }}</td>
                   <td>
                     <div class="actions" (click)="$event.stopPropagation()">
                       <button class="btn btn-secondary" style="padding:4px 10px;font-size:12px" (click)="openEdit(g)">
@@ -91,10 +91,10 @@ type ModalView = 'list' | 'add' | 'edit' | 'view';
             <div class="form-row cols-2">
               <div class="form-group">
                 <label class="form-label">Customer *</label>
-                <select class="form-control" [(ngModel)]="form.customerID" name="customerID"
+                <select class="form-control" [(ngModel)]="form.customerId" name="customerId"
                   required #custField="ngModel" [class.is-invalid]="custField.invalid && custField.touched">
                   <option [ngValue]="0" disabled>Select Customer</option>
-                  <option *ngFor="let c of customers" [ngValue]="c.customerID">{{ c.firstName }} {{ c.lastName }}</option>
+                  <option *ngFor="let c of customers" [ngValue]="c.customerId">{{ c.firstName }} {{ c.lastName }}</option>
                 </select>
                 <div class="invalid-feedback" *ngIf="custField.invalid && custField.touched">Customer is required.</div>
               </div>
@@ -173,10 +173,10 @@ type ModalView = 'list' | 'add' | 'edit' | 'view';
             <div class="form-row cols-2">
               <div class="form-group">
                 <label class="form-label">Customer *</label>
-                <select class="form-control" [(ngModel)]="form.customerID" name="customerID" required
+                <select class="form-control" [(ngModel)]="form.customerId" name="customerId" required
                   #custEditField="ngModel" [class.is-invalid]="custEditField.invalid && custEditField.touched">
                   <option [ngValue]="0" disabled>Select Customer</option>
-                  <option *ngFor="let c of customers" [ngValue]="c.customerID">{{ c.firstName }} {{ c.lastName }}</option>
+                  <option *ngFor="let c of customers" [ngValue]="c.customerId">{{ c.firstName }} {{ c.lastName }}</option>
                 </select>
                 <div class="invalid-feedback" *ngIf="custEditField.invalid && custEditField.touched">Customer is required.</div>
               </div>
@@ -260,7 +260,7 @@ type ModalView = 'list' | 'add' | 'edit' | 'view';
             <div class="detail-item"><span class="detail-label">CNIC</span><span class="detail-value">{{ selected.cnic }}</span></div>
             <div class="detail-item"><span class="detail-label">Phone</span><span class="detail-value">{{ selected.phone }}</span></div>
             <div class="detail-item"><span class="detail-label">Relation</span><span class="detail-value">{{ selected.relation || '—' }}</span></div>
-            <div class="detail-item"><span class="detail-label">Customer</span><span class="detail-value">{{ getCustomerName(selected.customerID) }}</span></div>
+            <div class="detail-item"><span class="detail-label">Customer</span><span class="detail-value">{{ getCustomerName(selected.customerId) }}</span></div>
             <div class="detail-item"><span class="detail-label">Occupation</span><span class="detail-value">{{ selected.occupation || '—' }}</span></div>
             <div class="detail-item"><span class="detail-label">Monthly Income</span><span class="detail-value">{{ selected.monthlyIncome ? (selected.monthlyIncome | number:'1.2-2') : '—' }}</span></div>
             <div class="detail-item full"><span class="detail-label">Address</span><span class="detail-value">{{ selected.address || '—' }}</span></div>
@@ -320,7 +320,7 @@ export class GuarantorsModalComponent implements OnInit {
   }
 
   getCustomerName(id: number): string {
-    const c = this.customers.find(x => x.customerID === id);
+    const c = this.customers.find(x => x.customerId === id);
     return c ? `${c.firstName} ${c.lastName}` : `#${id}`;
   }
 
@@ -366,6 +366,6 @@ export class GuarantorsModalComponent implements OnInit {
   }
 
   private blankForm(): Partial<Guarantor> {
-    return { customerID: 0, firstName: '', lastName: '', cnic: '', phone: '', relation: '', address: '', occupation: '', monthlyIncome: undefined };
+    return { customerId: 0, firstName: '', lastName: '', cnic: '', phone: '', relation: '', address: '', occupation: '', monthlyIncome: undefined };
   }
 }
