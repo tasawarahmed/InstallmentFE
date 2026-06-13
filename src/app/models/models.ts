@@ -99,6 +99,8 @@ export interface InstallmentPlan {
   customerId: number;
   productID: number;
   productSalePrice: number;
+  productCostPrice?: number;
+  profitAmount?: number;
   downPayment: number;
   loanAmount?: number;
   tenureMonths: number;

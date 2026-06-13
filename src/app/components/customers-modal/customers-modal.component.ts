@@ -3,9 +3,13 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, NgForm } from '@angular/forms';
 import { ApiService } from '../../services/api.service';
 import { Customer, Guarantor, InstallmentPlan, InstallmentPayment, Product } from '../../models/models';
+import jsPDF from 'jspdf';
 
 type MainView = 'list' | 'add' | 'edit' | 'view';
 type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
+
+const COMPANY_NAME = 'Al Wahab Installment Services';
+const COMPANY_TAGLINE = 'Installment Sales & Financing';
 
 @Component({
   selector: 'app-customers-modal',
@@ -213,11 +217,25 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
                   <label class="form-label">Relation</label>
                   <input class="form-control" [(ngModel)]="g.relation" [name]="'grel_'+gi" placeholder="Relation" />
                 </div>
-                <div class="form-group" style="justify-content:flex-end;flex-direction:row;align-items:flex-end">
-                  <button class="btn btn-danger" style="font-size:12px;padding:4px 10px" (click)="removeInlineGuarantor(gi)">
-                    <span class="material-icons" style="font-size:14px">delete</span>
-                  </button>
+                <div class="form-group">
+                  <label class="form-label">Occupation</label>
+                  <input class="form-control" [(ngModel)]="g.occupation" [name]="'gocc_'+gi" placeholder="Occupation" />
                 </div>
+              </div>
+              <div class="form-row cols-2">
+                <div class="form-group">
+                  <label class="form-label">Address</label>
+                  <input class="form-control" [(ngModel)]="g.address" [name]="'gaddr_'+gi" placeholder="Full address" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Monthly Income</label>
+                  <input class="form-control" type="number" [(ngModel)]="g.monthlyIncome" [name]="'ginc_'+gi" min="0" placeholder="0.00" />
+                </div>
+              </div>
+              <div class="form-row" style="justify-content:flex-end">
+                <button class="btn btn-danger" style="font-size:12px;padding:4px 10px" (click)="removeInlineGuarantor(gi)">
+                  <span class="material-icons" style="font-size:14px">delete</span> Remove Guarantor
+                </button>
               </div>
             </div>
           </div>
@@ -235,30 +253,41 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
               <div class="form-row cols-2">
                 <div class="form-group">
                   <label class="form-label">Product *</label>
-                  <select class="form-control" [(ngModel)]="planForm.productID" name="inlineProductID" (change)="onProductChange()">
+                  <select class="form-control" [(ngModel)]="planForm.productID" name="inlineProductID" (ngModelChange)="onProductChange()">
                     <option [ngValue]="0" disabled>Select Product</option>
                     <option *ngFor="let p of products" [ngValue]="p.productID">{{ p.productName }} — {{ p.salePrice | number:'1.2-2' }}</option>
                   </select>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Sale Price *</label>
-                  <input class="form-control" type="number" [(ngModel)]="planForm.productSalePrice" name="inlineSalePrice" min="0" />
+                  <input class="form-control" type="number" [(ngModel)]="planForm.productSalePrice" name="inlineSalePrice" min="0" (ngModelChange)="recalcInline()" />
+                </div>
+              </div>
+              <div class="form-row cols-2">
+                <div class="form-group">
+                  <label class="form-label">Cost Price</label>
+                  <input class="form-control" type="number" [(ngModel)]="planForm.productCostPrice" name="inlineCostPrice" min="0" (ngModelChange)="recalcInline()" />
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Profit (Sale − Cost)</label>
+                  <input class="form-control" type="number" [value]="inlineProfit()" readonly disabled />
                 </div>
               </div>
               <div class="form-row cols-2">
                 <div class="form-group">
                   <label class="form-label">Down Payment *</label>
-                  <input class="form-control" type="number" [(ngModel)]="planForm.downPayment" name="inlineDP" min="0" />
+                  <input class="form-control" type="number" [(ngModel)]="planForm.downPayment" name="inlineDP" min="0" (ngModelChange)="recalcInline()" />
                 </div>
                 <div class="form-group">
                   <label class="form-label">Tenure (months) *</label>
-                  <input class="form-control" type="number" [(ngModel)]="planForm.tenureMonths" name="inlineTenure" min="6" max="30" />
+                  <input class="form-control" type="number" [(ngModel)]="planForm.tenureMonths" name="inlineTenure" min="6" max="30" (ngModelChange)="recalcInline()" />
                 </div>
               </div>
               <div class="form-row cols-2">
                 <div class="form-group">
-                  <label class="form-label">Monthly Installment *</label>
+                  <label class="form-label">Monthly Installment (auto)</label>
                   <input class="form-control" type="number" [(ngModel)]="planForm.monthlyInstallment" name="inlineMI" min="0" />
+                  <span class="text-muted text-sm">Loan Amount: {{ inlineLoanAmount() | number:'1.2-2' }} • Total Payable: {{ inlineTotalPayable() | number:'1.2-2' }}</span>
                 </div>
                 <div class="form-group">
                   <label class="form-label">Start Date *</label>
@@ -425,7 +454,32 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
             <div class="detail-item full"><span class="detail-label">Notes</span><span class="detail-value">{{ selected.notes || '—' }}</span></div>
           </div>
 
-          <h3 class="section-heading">Active Installment Plans</h3>
+          <h3 class="section-heading">Guarantors</h3>
+          <div class="table-wrapper" *ngIf="selectedGuarantors.length > 0">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>CNIC</th>
+                  <th>Phone</th>
+                  <th>Relation</th>
+                  <th>Address</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let g of selectedGuarantors">
+                  <td class="font-bold">{{ g.firstName }} {{ g.lastName }}</td>
+                  <td>{{ g.cnic }}</td>
+                  <td>{{ g.phone }}</td>
+                  <td>{{ g.relation || '—' }}</td>
+                  <td>{{ g.address || '—' }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-muted text-sm" *ngIf="selectedGuarantors.length === 0">No guarantors on file.</p>
+
+          <h3 class="section-heading">Installment Plans</h3>
           <div class="loading-center" *ngIf="plansLoading"><div class="spinner"></div></div>
           <div class="table-wrapper" *ngIf="!plansLoading">
             <table class="data-table">
@@ -433,6 +487,8 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
                 <tr>
                   <th>Product</th>
                   <th>Sale Price</th>
+                  <th>Cost Price</th>
+                  <th>Profit</th>
                   <th>Down Payment</th>
                   <th>Monthly</th>
                   <th>Tenure</th>
@@ -443,20 +499,27 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
               </thead>
               <tbody>
                 <tr *ngIf="selectedPlans.length === 0">
-                  <td colspan="8" class="text-center text-muted" style="padding:var(--space-6)">No installment plans found.</td>
+                  <td colspan="10" class="text-center text-muted" style="padding:var(--space-6)">No installment plans found.</td>
                 </tr>
                 <tr *ngFor="let plan of selectedPlans" (click)="$event.stopPropagation()">
                   <td class="font-bold">{{ getProductName(plan.productID) }}</td>
                   <td>{{ plan.productSalePrice | number:'1.2-2' }}</td>
+                  <td>{{ getProductCostPrice(plan.productID) | number:'1.2-2' }}</td>
+                  <td>{{ (plan.productSalePrice - getProductCostPrice(plan.productID)) | number:'1.2-2' }}</td>
                   <td>{{ plan.downPayment | number:'1.2-2' }}</td>
                   <td>{{ plan.monthlyInstallment | number:'1.2-2' }}</td>
                   <td>{{ plan.tenureMonths }} mo.</td>
                   <td>{{ plan.startDate }}</td>
                   <td><span class="badge" [ngClass]="planStatusClass(plan.status)">{{ plan.status }}</span></td>
                   <td>
-                    <button class="btn btn-success" style="padding:4px 8px;font-size:11px" (click)="openPayment(plan)">
-                      <span class="material-icons" style="font-size:13px">payments</span> Payment
-                    </button>
+                    <div class="actions">
+                      <button class="btn btn-success" style="padding:4px 8px;font-size:11px" (click)="openPayment(plan)">
+                        <span class="material-icons" style="font-size:13px">payments</span> Payment
+                      </button>
+                      <button class="btn btn-secondary" style="padding:4px 8px;font-size:11px" title="Print Plan" (click)="printPlanPdf(plan)">
+                        <span class="material-icons" style="font-size:13px">print</span> Print
+                      </button>
+                    </div>
                   </td>
                 </tr>
               </tbody>
@@ -479,7 +542,7 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
           <form #planF="ngForm" novalidate>
             <div class="form-group">
               <label class="form-label">Product *</label>
-              <select class="form-control" [(ngModel)]="planForm.productID" name="productID" required (change)="onProductChange()"
+              <select class="form-control" [(ngModel)]="planForm.productID" name="productID" required (ngModelChange)="onProductChange()"
                 #pdField="ngModel" [class.is-invalid]="pdField.invalid && pdField.touched">
                 <option [ngValue]="0" disabled>Select Product</option>
                 <option *ngFor="let p of products" [ngValue]="p.productID">{{ p.productName }} — {{ p.salePrice | number:'1.2-2' }}</option>
@@ -490,13 +553,24 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
               <div class="form-group">
                 <label class="form-label">Sale Price *</label>
                 <input class="form-control" type="number" [(ngModel)]="planForm.productSalePrice" name="productSalePrice" required min="0"
-                  #spField="ngModel" [class.is-invalid]="spField.invalid && spField.touched" placeholder="0.00" />
+                  #spField="ngModel" [class.is-invalid]="spField.invalid && spField.touched" placeholder="0.00" (ngModelChange)="recalcPlan()" />
                 <div class="invalid-feedback" *ngIf="spField.invalid && spField.touched">Required.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Cost Price</label>
+                <input class="form-control" type="number" [(ngModel)]="planForm.productCostPrice" name="productCostPrice" min="0"
+                  placeholder="0.00" (ngModelChange)="recalcPlan()" />
+              </div>
+            </div>
+            <div class="form-row cols-2">
+              <div class="form-group">
+                <label class="form-label">Profit (Sale − Cost)</label>
+                <input class="form-control" type="number" [value]="planProfit()" readonly disabled />
               </div>
               <div class="form-group">
                 <label class="form-label">Down Payment *</label>
                 <input class="form-control" type="number" [(ngModel)]="planForm.downPayment" name="downPayment" required min="0"
-                  #dpField="ngModel" [class.is-invalid]="dpField.invalid && dpField.touched" placeholder="0.00" />
+                  #dpField="ngModel" [class.is-invalid]="dpField.invalid && dpField.touched" placeholder="0.00" (ngModelChange)="recalcPlan()" />
                 <div class="invalid-feedback" *ngIf="dpField.invalid && dpField.touched">Required.</div>
               </div>
             </div>
@@ -504,16 +578,17 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
               <div class="form-group">
                 <label class="form-label">Tenure (months, 6–30) *</label>
                 <input class="form-control" type="number" [(ngModel)]="planForm.tenureMonths" name="tenureMonths" required min="6" max="30"
-                  #tmField="ngModel" [class.is-invalid]="tmField.invalid && tmField.touched" placeholder="12" />
+                  #tmField="ngModel" [class.is-invalid]="tmField.invalid && tmField.touched" placeholder="12" (ngModelChange)="recalcPlan()" />
                 <div class="invalid-feedback" *ngIf="tmField.invalid && tmField.touched">6–30 months required.</div>
               </div>
               <div class="form-group">
-                <label class="form-label">Monthly Installment *</label>
+                <label class="form-label">Monthly Installment (auto)</label>
                 <input class="form-control" type="number" [(ngModel)]="planForm.monthlyInstallment" name="monthlyInstallment" required min="0"
                   #miField="ngModel" [class.is-invalid]="miField.invalid && miField.touched" placeholder="0.00" />
                 <div class="invalid-feedback" *ngIf="miField.invalid && miField.touched">Required.</div>
               </div>
             </div>
+            <p class="text-muted text-sm">Loan Amount: <strong>{{ planLoanAmount() | number:'1.2-2' }}</strong> • Total Payable: <strong>{{ planTotalPayable() | number:'1.2-2' }}</strong></p>
             <div class="form-row cols-2">
               <div class="form-group">
                 <label class="form-label">Start Date *</label>
@@ -534,6 +609,9 @@ type SubView = 'addGuarantor' | 'addPlan' | 'payment' | null;
         </div>
         <div class="modal-footer">
           <button class="btn btn-secondary" (click)="subView = null">Cancel</button>
+          <button class="btn btn-secondary" (click)="printPlanPreviewPdf()">
+            <span class="material-icons" style="font-size:14px">print</span> Print Plan
+          </button>
           <button class="btn btn-primary" (click)="savePlan(planF)" [disabled]="saving">
             <div class="spinner sm" *ngIf="saving"></div>
             {{ saving ? 'Saving…' : 'Create Plan' }}
@@ -660,8 +738,10 @@ export class CustomersModalComponent implements OnInit {
   customers: Customer[] = [];
   plans: InstallmentPlan[] = [];
   products: Product[] = [];
+  guarantors: Guarantor[] = [];
   selected: Customer | null = null;
   selectedPlans: InstallmentPlan[] = [];
+  selectedGuarantors: Guarantor[] = [];
   selectedPlan: InstallmentPlan | null = null;
   loading = true;
   plansLoading = false;
@@ -682,6 +762,7 @@ export class CustomersModalComponent implements OnInit {
   ngOnInit(): void {
     this.api.getProducts().subscribe({ next: d => this.products = d, error: () => {} });
     this.api.getInstallmentPlans().subscribe({ next: d => { this.plans = d; this.cdr.detectChanges() } , error: () => {} });
+    this.api.getGuarantors().subscribe({ next: d => this.guarantors = d, error: () => {} });
     this.loadCustomers();
   }
 
@@ -714,6 +795,12 @@ export class CustomersModalComponent implements OnInit {
     return p ? p.productName : `#${id}`;
   }
 
+  getProductCostPrice(id?: number): number {
+    if (!id) return 0;
+    const p = this.products.find(x => x.productID === id);
+    return p ? p.costPrice : 0;
+  }
+
   customerStatusClass(s: string): Record<string, boolean> {
     return { 'badge-success': s === 'Active', 'badge-danger': s === 'Blacklisted', 'badge-neutral': s === 'Inactive' };
   }
@@ -741,6 +828,7 @@ export class CustomersModalComponent implements OnInit {
     this.selected = c;
     this.view = 'view';
     this.plansLoading = true;
+    this.selectedGuarantors = this.guarantors.filter(g => g.customerId === c.customerId);
     this.api.getInstallmentPlansByCustomer(c.customerId!).subscribe({
       next: d => { this.selectedPlans = d; this.plansLoading = false; this.cdr.detectChanges() },
       error: () => { this.selectedPlans = []; this.plansLoading = false; }
@@ -762,7 +850,7 @@ export class CustomersModalComponent implements OnInit {
   }
 
   addInlineGuarantor(): void {
-    this.inlineGuarantors.push({ firstName: '', lastName: '', cnic: '', phone: '', relation: '' });
+    this.inlineGuarantors.push({ firstName: '', lastName: '', cnic: '', phone: '', relation: '', address: '', occupation: '', monthlyIncome: undefined });
   }
 
   removeInlineGuarantor(i: number): void {
@@ -771,7 +859,69 @@ export class CustomersModalComponent implements OnInit {
 
   onProductChange(): void {
     const p = this.products.find(x => x.productID === this.planForm.productID);
-    if (p) this.planForm.productSalePrice = p.salePrice;
+    if (p) {
+      this.planForm.productSalePrice = p.salePrice;
+      this.planForm.productCostPrice = p.costPrice;
+    }
+    this.recalcPlan();
+  }
+
+  // ---- Calculation helpers (Add Plan sub-form) ----
+  planLoanAmount(): number {
+    const sale = this.planForm.productSalePrice || 0;
+    const dp = this.planForm.downPayment || 0;
+    return Math.max(0, sale - dp);
+  }
+
+  planTotalPayable(): number {
+    const dp = this.planForm.downPayment || 0;
+    const mi = this.planForm.monthlyInstallment || 0;
+    const tenure = this.planForm.tenureMonths || 0;
+    return dp + (mi * tenure);
+  }
+
+  planProfit(): number {
+    const sale = this.planForm.productSalePrice || 0;
+    const cost = this.planForm.productCostPrice || 0;
+    return sale - cost;
+  }
+
+  recalcPlan(): void {
+    const tenure = this.planForm.tenureMonths || 0;
+    if (tenure > 0) {
+      const loanAmount = this.planLoanAmount();
+      this.planForm.monthlyInstallment = Math.round((loanAmount / tenure) * 100) / 100;
+    }
+    this.planForm.loanAmount = this.planLoanAmount();
+  }
+
+  // ---- Calculation helpers (Inline plan in Add Customer modal) ----
+  inlineLoanAmount(): number {
+    const sale = this.planForm.productSalePrice || 0;
+    const dp = this.planForm.downPayment || 0;
+    return Math.max(0, sale - dp);
+  }
+
+  inlineTotalPayable(): number {
+    const dp = this.planForm.downPayment || 0;
+    const mi = this.planForm.monthlyInstallment || 0;
+    const tenure = this.planForm.tenureMonths || 0;
+    return dp + (mi * tenure);
+  }
+
+  inlineProfit(): number {
+    const sale = this.planForm.productSalePrice || 0;
+    const cost = this.planForm.productCostPrice || 0;
+    return sale - cost;
+  }
+
+  recalcInline(): void {
+    const tenure = this.planForm.tenureMonths || 0;
+    if (tenure > 0) {
+      const loanAmount = this.inlineLoanAmount();
+      this.planForm.monthlyInstallment = Math.round((loanAmount / tenure) * 100) / 100;
+    }
+    this.planForm.loanAmount = this.inlineLoanAmount();
   }
 
   saveAdd(f: NgForm): void {
@@ -781,10 +931,11 @@ export class CustomersModalComponent implements OnInit {
     this.saving = true;
     this.api.createCustomer(this.custForm as Customer).subscribe({
       next: newCust => {
-        const promises: Array<() => void> = [];
         for (const g of this.inlineGuarantors) {
           if (g.firstName && g.cnic && g.phone) {
-            this.api.createGuarantor({ ...g, customerId: newCust.customerId! } as Guarantor).subscribe();
+            this.api.createGuarantor({ ...g, customerId: newCust.customerId! } as Guarantor).subscribe({
+              next: created => this.guarantors.push(created)
+            });
           }
         }
         if (this.addPlanInline && this.planForm.productID) {
@@ -832,13 +983,222 @@ export class CustomersModalComponent implements OnInit {
     if ((e.target as HTMLElement).classList.contains('modal-overlay')) this.close.emit();
   }
 
+  // ================= PDF GENERATION =================
+
+  /** Print button used in the "New Installment Plan" sub-form (before saving). */
+  printPlanPreviewPdf(): void {
+    const planData: Partial<InstallmentPlan> = {
+      ...this.planForm,
+      customerId: this.selected?.customerId
+    };
+    this.generatePlanPdf(planData, this.selected || undefined);
+  }
+
+  /** Print button used on an already-saved plan row in the customer detail view. */
+  printPlanPdf(plan: InstallmentPlan): void {
+    const customer = this.customers.find(c => c.customerId === plan.customerId) || this.selected || undefined;
+    this.generatePlanPdf(plan, customer);
+  }
+
+  private generatePlanPdf(plan: Partial<InstallmentPlan>, customer?: Customer): void {
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 40;
+    let y = 50;
+
+    // ---- Header: Company Name ----
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text(COMPANY_NAME, pageWidth / 2, y, { align: 'center' });
+    y += 20;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(COMPANY_TAGLINE, pageWidth / 2, y, { align: 'center' });
+    y += 10;
+    doc.setLineWidth(1);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 25;
+
+    // ---- Title ----
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('Installment Plan Agreement', pageWidth / 2, y, { align: 'center' });
+    y += 30;
+
+    // ---- Customer Info ----
+    const product = this.products.find(p => p.productID === plan.productID);
+    const guarantors = this.selectedGuarantors.length
+      ? this.selectedGuarantors
+      : this.guarantors.filter(g => g.customerId === (customer?.customerId ?? plan.customerId));
+
+    const salePrice = plan.productSalePrice || 0;
+    const downPayment = plan.downPayment || 0;
+    const tenure = plan.tenureMonths || 0;
+    const monthly = plan.monthlyInstallment || 0;
+    const loanAmount = plan.loanAmount ?? Math.max(0, salePrice - downPayment);
+    const totalPayable = plan.totalPayable ?? (downPayment + monthly * tenure);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Customer Details', margin, y);
+    y += 18;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const custName = customer ? `${customer.firstName} ${customer.lastName}` : '—';
+    y = this.printRow(doc, margin, y, 'Customer Name:', custName);
+    y = this.printRow(doc, margin, y, 'CNIC:', customer?.cnic || '—');
+    y = this.printRow(doc, margin, y, 'Phone:', customer?.phone || '—');
+    y = this.printRow(doc, margin, y, 'Address:', customer?.address || '—');
+    y += 12;
+
+    // ---- Guarantor Info ----
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Guarantor Details', margin, y);
+    y += 18;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    if (guarantors.length === 0) {
+      doc.text('No guarantor on record.', margin, y);
+      y += 18;
+    } else {
+      for (const g of guarantors) {
+        y = this.printRow(doc, margin, y, 'Guarantor Name:', `${g.firstName} ${g.lastName}`);
+        y = this.printRow(doc, margin, y, 'CNIC:', g.cnic || '—');
+        y = this.printRow(doc, margin, y, 'Phone:', g.phone || '—');
+        y = this.printRow(doc, margin, y, 'Relation:', g.relation || '—');
+        y = this.printRow(doc, margin, y, 'Address:', g.address || '—');
+        y += 8;
+      }
+    }
+    y += 6;
+
+    // ---- Product / Plan Info ----
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Product & Plan Details', margin, y);
+    y += 18;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const productLabel = (product?.productName || this.getProductName(plan.productID) || '—')
+      + (product?.brand ? ` (${product.brand}${product.model ? ' ' + product.model : ''})` : '');
+    y = this.printRow(doc, margin, y, 'Product:', productLabel);
+    y = this.printRow(doc, margin, y, 'Sale Price:', this.formatCurrency(salePrice));
+    y = this.printRow(doc, margin, y, 'Down Payment:', this.formatCurrency(downPayment));
+    y = this.printRow(doc, margin, y, 'Loan Amount (Sale - Down Payment):', this.formatCurrency(loanAmount));
+    y = this.printRow(doc, margin, y, 'Tenure:', `${tenure} months`);
+    y = this.printRow(doc, margin, y, 'Monthly Installment:', this.formatCurrency(monthly));
+    y = this.printRow(doc, margin, y, 'Total Payable (Down Payment + Installments):', this.formatCurrency(totalPayable));
+    y = this.printRow(doc, margin, y, 'Start Date:', this.formatDateDisplay(plan.startDate));
+    if (plan.endDate) y = this.printRow(doc, margin, y, 'End Date:', this.formatDateDisplay(plan.endDate));
+    y = this.printRow(doc, margin, y, 'Status:', plan.status || 'Active');
+    y = this.printRow(doc, margin, y, 'Approved By:', plan.approvedBy || '—');
+    if (plan.notes) y = this.printRow(doc, margin, y, 'Notes:', plan.notes);
+    y += 14;
+
+    // ---- Payment Schedule Table ----
+    if (y > 680) { doc.addPage(); y = 50; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Payment Schedule', margin, y);
+    y += 18;
+
+    const colX = [margin, margin + 50, margin + 150, margin + 280, margin + 380];
+    const colHeaders = ['#', 'Due Date', 'Amount', 'Type', 'Status'];
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    colHeaders.forEach((h, i) => doc.text(h, colX[i], y));
+    y += 4;
+    doc.setLineWidth(0.5);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 14;
+
+    doc.setFont('helvetica', 'normal');
+    // Row 0: Down Payment
+    const startDateObj = plan.startDate ? new Date(plan.startDate) : new Date();
+    doc.text('—', colX[0], y);
+    doc.text(this.formatDateDDMMYYYY(startDateObj), colX[1], y);
+    doc.text(this.formatCurrency(downPayment), colX[2], y);
+    doc.text('Down Payment', colX[3], y);
+    doc.text('Pending', colX[4], y);
+    y += 16;
+
+    for (let i = 1; i <= tenure; i++) {
+      if (y > 760) { doc.addPage(); y = 50; }
+      const dueDate = new Date(startDateObj);
+      dueDate.setMonth(dueDate.getMonth() + i);
+      doc.text(String(i), colX[0], y);
+      doc.text(this.formatDateDDMMYYYY(dueDate), colX[1], y);
+      doc.text(this.formatCurrency(monthly), colX[2], y);
+      doc.text('Installment', colX[3], y);
+      doc.text('Pending', colX[4], y);
+      y += 16;
+    }
+
+    y += 10;
+    if (y > 750) { doc.addPage(); y = 50; }
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Total Payable: ${this.formatCurrency(totalPayable)}`, margin, y);
+    y += 30;
+
+    // ---- Signatures ----
+    if (y > 720) { doc.addPage(); y = 50; }
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.line(margin, y, margin + 150, y);
+    doc.line(pageWidth - margin - 150, y, pageWidth - margin, y);
+    y += 14;
+    doc.text('Customer Signature', margin, y);
+    doc.text('Authorized Signature', pageWidth - margin - 150, y);
+
+    // ---- Footer ----
+    doc.setFontSize(8);
+    doc.setTextColor(120);
+    doc.text(`Generated on ${this.formatDateDDMMYYYY(new Date())}`, margin, doc.internal.pageSize.getHeight() - 20);
+
+    const fileName = `InstallmentPlan_${(custName || 'Customer').replace(/\s+/g, '_')}_${(product?.productName || 'Product').replace(/\s+/g, '_')}.pdf`;
+    doc.save(fileName);
+  }
+
+  private printRow(doc: jsPDF, x: number, y: number, label: string, value: string): number {
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const valueX = pageWidth / 2 + 10;
+    const maxWidth = pageWidth - 40 - valueX;
+    doc.setFont('helvetica', 'bold');
+    doc.text(label, x, y);
+    doc.setFont('helvetica', 'normal');
+    const lines = doc.splitTextToSize(value, maxWidth);
+    doc.text(lines, valueX, y);
+    return y + (16 * Math.max(1, lines.length));
+  }
+
+  private formatCurrency(n: number): string {
+    return (n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  /** dd-mm-yyyy from a Date object */
+  private formatDateDDMMYYYY(d: Date): string {
+    const dd = String(d.getDate()).padStart(2, '0');
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    return `${dd}-${mm}-${yyyy}`;
+  }
+
+  /** dd-mm-yyyy from a date string (e.g. '2026-06-13') or '—' if empty */
+  private formatDateDisplay(dateStr?: string): string {
+    if (!dateStr) return '—';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return this.formatDateDDMMYYYY(d);
+  }
+
   private blankCustomer(): Partial<Customer> {
     return { firstName: '', lastName: '', cnic: '', phone: '', alternatePhone: '', email: '', address: '', city: '', occupation: '', employerName: '', monthlyIncome: undefined, status: 'Active', notes: '' };
   }
 
   private blankPlan(): Partial<InstallmentPlan> {
     const today = new Date().toISOString().split('T')[0];
-    return { productID: 0, productSalePrice: 0, downPayment: 0, tenureMonths: 12, monthlyInstallment: 0, startDate: today, approvedBy: '', notes: '' };
+    return { productID: 0, productSalePrice: 0, productCostPrice: 0, downPayment: 0, tenureMonths: 12, monthlyInstallment: 0, startDate: today, approvedBy: '', notes: '' };
   }
 
   private blankPayment(): Partial<InstallmentPayment> {
