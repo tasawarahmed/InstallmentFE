@@ -7,7 +7,7 @@ import {
 } from '../models/models';
 
 // const BASE_URL = 'https://localhost:7120/api';
-const BASE_URL = 'http://temp.somee.com/InstallmentAPI_Publish/api';
+const BASE_URL = 'https://temp.somee.com/InstallmentAPI_Publish/api';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
